@@ -1,0 +1,30 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: 
+      - completed
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Install SSH key
+      uses: webfactory/ssh-agent@v0.4.1
+      with:
+        ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+    - name: Deploy Docker Image
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "
+        docker pull ${{ secrets.HARBOR_REGISTRY_URL }}/REPO_NAME/IMAGE_NAME:latest
+        docker stop my_api || true
+        docker rm my_api || true
+        docker run -d --name my_api -p 80:80 ${{ secrets.HARBOR_REGISTRY_URL }}/REPO_NAME/IMAGE_NAME:latest
+        "
+
